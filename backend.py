@@ -148,25 +148,25 @@ async def broadcast_log_data(log_data: Dict[str, Any]):
         for connection in disconnected:
             active_connections.remove(connection)
 
-def handle_tcp_connection(client_socket, address):
+def handle_tcp_connection(client_socket: socket.socket, address: tuple[str, int]) -> None:
     """Handle incoming TCP connections from log agents."""
     print(f"TCP connection from {address}")
     
     try:
         while True:
-            data = client_socket.recv(4096)
+            data: bytes = client_socket.recv(4096)
             if not data:
                 break
             
             # Decode and process each line
-            lines = data.decode('utf-8').strip().split('\n')
+            lines: list[str] = data.decode('utf-8').strip().split('\n')
             for line in lines:
                 if line.strip():
                     try:
-                        log_data = json.loads(line)
+                        log_data: Dict[str, Any] = json.loads(line)
                         
                         # Parse the raw log line
-                        parsed_data = parse_nginx_log(log_data["raw_line"])
+                        parsed_data: Dict[str, Any] = parse_nginx_log(log_data["raw_line"])
                         log_data["parsed_data"] = parsed_data
                         log_data["id"] = f"{int(time.time() * 1000)}_{hash(line) % 10000}"
                         
@@ -242,7 +242,7 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"WebSocket client disconnected. Total connections: {len(active_connections)}")
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, Any]:
     """Root endpoint with basic info."""
     return {
         "message": "Server Shepherd Backend",
@@ -252,12 +252,12 @@ async def root():
     }
 
 @app.get("/logs")
-async def get_recent_logs(limit: int = 100):
+async def get_recent_logs(limit: int = 100) -> Dict[str, List[Dict[str, Any]]]:
     """Get recent log entries."""
     return {"logs": log_buffer[-limit:]}
 
 @app.post("/acknowledge")
-async def acknowledge_error(request: AcknowledgeRequest):
+async def acknowledge_error(request: AcknowledgeRequest) -> Dict[str, Any]:
     """Acknowledge an error log entry."""
     # Find the log entry in the buffer and mark it as acknowledged
     for log in log_buffer:
@@ -269,7 +269,7 @@ async def acknowledge_error(request: AcknowledgeRequest):
     return {"status": "not_found", "log_id": request.log_id, "message": "Log entry not found"}
 
 @app.get("/stats")
-async def get_stats():
+async def get_stats() -> Dict[str, Any]:
     """Get basic statistics about the logs."""
     if not log_buffer:
         return {"total_logs": 0, "error_count": 0, "success_count": 0, "error_rate": 0.0}

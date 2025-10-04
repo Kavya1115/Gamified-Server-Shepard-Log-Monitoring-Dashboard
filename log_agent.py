@@ -15,14 +15,15 @@ from watchdog.events import FileSystemEventHandler
 class LogFileHandler(FileSystemEventHandler):
     """Handles file modification events for log monitoring."""
     
-    def __init__(self, log_file_path, backend_host='localhost', backend_port=9999):
-        self.log_file_path = Path(log_file_path)
-        self.backend_host = backend_host
-        self.backend_port = backend_port
-        self.socket = None
+    def __init__(self, log_file_path: str, backend_host: str = 'localhost', backend_port: int = 9999) -> None:
+        self.log_file_path: Path = Path(log_file_path)
+        self.backend_host: str = backend_host
+        self.backend_port: int = backend_port
+        self.socket: socket.socket | None = None
+        self.last_line_count: int = 0
         self.connect_to_backend()
         
-    def connect_to_backend(self):
+    def connect_to_backend(self) -> None:
         """Establish connection to the backend server."""
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,44 +37,46 @@ class LogFileHandler(FileSystemEventHandler):
             print(f"Error connecting to backend: {e}")
             sys.exit(1)
     
-    def on_modified(self, event):
+    def on_modified(self, event: FileSystemEventHandler) -> None:
         """Handle file modification events."""
-        if event.is_directory:
+        if getattr(event, "is_directory", False):
             return
             
         # Check if the modified file is our target log file
-        if Path(event.src_path) == self.log_file_path:
+        if Path(getattr(event, "src_path", "")) == self.log_file_path:
             self.send_new_log_lines()
     
-    def send_new_log_lines(self):
+    def send_new_log_lines(self) -> None:
         """Read new lines from the log file and send them to backend."""
         try:
             with open(self.log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 # Read all lines and get the new ones
-                lines = f.readlines()
-                new_lines = lines[self.last_line_count:] if hasattr(self, 'last_line_count') else lines
+                lines: list[str] = f.readlines()
+                new_lines: list[str] = lines[self.last_line_count:] if hasattr(self, 'last_line_count') else lines
                 self.last_line_count = len(lines)
                 
                 for line in new_lines:
                     line = line.strip()
                     if line:  # Only send non-empty lines
                         # Send the log line as JSON
-                        log_data = {
+                        log_data: dict[str, object] = {
                             "timestamp": time.time(),
                             "raw_line": line,
                             "source": str(self.log_file_path)
                         }
                         
-                        message = json.dumps(log_data) + '\n'
-                        self.socket.send(message.encode('utf-8'))
+                        message: str = json.dumps(log_data) + '\n'
+                        if self.socket is not None:
+                            self.socket.send(message.encode('utf-8'))
                         print(f"Sent log line: {line[:50]}...")
                         
         except Exception as e:
             print(f"Error reading/sending log file: {e}")
             # Try to reconnect if connection was lost
             try:
-                self.socket.close()
-            except:
+                if self.socket is not None:
+                    self.socket.close()
+            except Exception:
                 pass
             self.connect_to_backend()
 
@@ -98,8 +101,6 @@ def main():
     
     # Create event handler
     event_handler = LogFileHandler(log_file_path, backend_host, backend_port)
-    
-    # Set up observer
     observer = Observer()
     observer.schedule(event_handler, str(Path(log_file_path).parent), recursive=False)
     
@@ -114,13 +115,16 @@ def main():
     except KeyboardInterrupt:
         print("\nStopping log agent...")
         observer.stop()
-        event_handler.socket.close()
+        if event_handler.socket is not None:
+            event_handler.socket.close()
     except Exception as e:
         print(f"Error in log agent: {e}")
         observer.stop()
-        event_handler.socket.close()
+        if event_handler.socket is not None:
+            event_handler.socket.close()
     finally:
         observer.join()
+        print("Log agent stopped.")
         print("Log agent stopped.")
 
 if __name__ == "__main__":

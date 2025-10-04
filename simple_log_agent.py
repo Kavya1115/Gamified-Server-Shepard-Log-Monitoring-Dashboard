@@ -13,12 +13,12 @@ from pathlib import Path
 class SimpleLogAgent:
     """Simple log agent that polls file for changes."""
     
-    def __init__(self, log_file_path, backend_host='localhost', backend_port=9999):
-        self.log_file_path = Path(log_file_path)
-        self.backend_host = backend_host
-        self.backend_port = backend_port
-        self.socket = None
-        self.last_position = 0
+    def __init__(self, log_file_path: str, backend_host: str = 'localhost', backend_port: int = 9999):
+        self.log_file_path: Path = Path(log_file_path)
+        self.backend_host: str = backend_host
+        self.backend_port: int = backend_port
+        self.socket: socket.socket | None = None
+        self.last_position: int = 0
         self.connect_to_backend()
         
     def connect_to_backend(self):
@@ -35,25 +35,29 @@ class SimpleLogAgent:
             print(f"Error connecting to backend: {e}")
             sys.exit(1)
     
-    def send_log_line(self, line):
+    def send_log_line(self, line: str) -> None:
         """Send a log line to the backend."""
         try:
-            log_data = {
+            log_data: dict[str, object] = {
                 "timestamp": time.time(),
                 "raw_line": line,
                 "source": str(self.log_file_path)
             }
             
-            message = json.dumps(log_data) + '\n'
-            self.socket.send(message.encode('utf-8'))
-            print(f"Sent log line: {line[:50]}...")
+            message: str = json.dumps(log_data) + '\n'
+            if self.socket is not None:
+                self.socket.send(message.encode('utf-8'))
+                print(f"Sent log line: {line[:50]}...")
+            else:
+                print("Socket is not connected. Cannot send log line.")
             
         except Exception as e:
             print(f"Error sending log line: {e}")
             # Try to reconnect
             try:
-                self.socket.close()
-            except:
+                if self.socket is not None:
+                    self.socket.close()
+            except Exception:
                 pass
             self.connect_to_backend()
     

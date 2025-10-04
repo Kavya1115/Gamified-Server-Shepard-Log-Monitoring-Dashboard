@@ -65,11 +65,11 @@ body {
 
 .stat-value {
   font-weight: bold;
-  color: #4CAF50;
+  color: #ffffff;
 }
 
 .stat-value.error {
-  color: #f44336;
+  color: #ffffff;
 }
 
 .controls {
